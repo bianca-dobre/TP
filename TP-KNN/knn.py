@@ -15,30 +15,30 @@ emotions = {
 }
 
 def load_dataset(folder_path):
-    X = [] #images
-    y = [] #labels
-    for emotion in os.listdir(folder_path):
+    X = [] #liste pour les images uploadees
+    y = [] #liste pour les etiquettes des images
+    for emotion in os.listdir(folder_path): #parcourir chaque directoire avec une emotion
         emotion_path = os.path.join(folder_path, emotion)
         if not os.path.isdir(emotion_path):
             continue
-        label = emotions.get(emotion.lower())
+        label = emotions.get(emotion.lower()) #etiquette specifique
         if label is None:
             continue
-        for image_name in os.listdir(emotion_path):
+        for image_name in os.listdir(emotion_path): #parcourir les images de directoire
             image_path = os.path.join(emotion_path, image_name)
             image = cv2.imread(image_path, cv2.IMREAD_GRAYSCALE)
             if image is None:
                 continue
             image = cv2.resize(image, (48, 48))
-            X.append(image)
-            y.append(label)
+            X.append(image) #ajouter l'image dans la liste
+            y.append(label) #ajouter l'etiquette dans la liste
     return np.array(X), np.array(y)
-def extract_lbp_features(images):
+def extract_lbp_features(images): #pour extraire les caracteristiques LBP des images
     features = []
     for image in images:
-        lbp = local_binary_pattern(image, P=8, R=1, method='uniform')
-        h, _ = np.histogram(lbp.ravel(), bins=np.arange(0, 10), range=(0, 9))
-        h = h.astype("float") / (h.sum() + 1e-7)
+        lbp = local_binary_pattern(image, P=8, R=1, method='uniform') #P=voisins, R=rayon
+        h, _ = np.histogram(lbp.ravel(), bins=np.arange(0, 10), range=(0, 9)) #l'histogramme de LBP avec un vector de 9 elements
+        h = h.astype("float") / (h.sum() + 1e-7) #normaliser l'histogramme pour eviter la division par 0
         features.append(h)
     return np.array(features)
 print("loading training data...")
