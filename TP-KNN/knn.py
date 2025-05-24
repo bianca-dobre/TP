@@ -4,9 +4,7 @@ import numpy as np
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.metrics import classification_report
 from skimage.feature import local_binary_pattern
-
-# Dictionar cu etichete
-label_dict = {
+emotions = {
     'angry': 0,
     'disgust': 1,
     'fear': 2,
@@ -16,54 +14,47 @@ label_dict = {
     'neutral': 6
 }
 
-# Încarcă imaginile și etichetele
 def load_dataset(folder_path):
-    X = []
-    y = []
+    X = [] #images
+    y = [] #labels
     for emotion in os.listdir(folder_path):
         emotion_path = os.path.join(folder_path, emotion)
         if not os.path.isdir(emotion_path):
             continue
-        label = label_dict.get(emotion.lower())
+        label = emotions.get(emotion.lower())
         if label is None:
             continue
-        for img_name in os.listdir(emotion_path):
-            img_path = os.path.join(emotion_path, img_name)
-            img = cv2.imread(img_path, cv2.IMREAD_GRAYSCALE)
-            if img is None:
+        for image_name in os.listdir(emotion_path):
+            image_path = os.path.join(emotion_path, image_name)
+            image = cv2.imread(image_path, cv2.IMREAD_GRAYSCALE)
+            if image is None:
                 continue
-            img = cv2.resize(img, (48, 48))
-            X.append(img)
+            image = cv2.resize(image, (48, 48))
+            X.append(image)
             y.append(label)
     return np.array(X), np.array(y)
-
-# Extrage trăsături LBP
 def extract_lbp_features(images):
     features = []
-    for img in images:
-        lbp = local_binary_pattern(img, P=8, R=1, method='uniform')
-        hist, _ = np.histogram(lbp.ravel(), bins=np.arange(0, 10), range=(0, 9))
-        hist = hist.astype("float") / (hist.sum() + 1e-7)
-        features.append(hist)
+    for image in images:
+        lbp = local_binary_pattern(image, P=8, R=1, method='uniform')
+        h, _ = np.histogram(lbp.ravel(), bins=np.arange(0, 10), range=(0, 9))
+        h = h.astype("float") / (h.sum() + 1e-7)
+        features.append(h)
     return np.array(features)
+print("loading training data...")
+X_train_image, y_train = load_dataset("database/train")
+print("loading testing data...")
+X_test_image, y_test = load_dataset("database/test")
 
-# Încarcă datele
-print("Loading training data...")
-X_train_img, y_train = load_dataset("database/train")
-print("Loading testing data...")
-X_test_img, y_test = load_dataset("database/test")
+print("extracting features using LBP...")
+X_train = extract_lbp_features(X_train_image)
+X_test = extract_lbp_features(X_test_image)
 
-# Extrage trăsături
-print("Extracting features...")
-X_train = extract_lbp_features(X_train_img)
-X_test = extract_lbp_features(X_test_img)
-
-# Antrenează modelul KNN
-print("Training KNN classifier...")
+print("training KNN classifier...")
 model = KNeighborsClassifier(n_neighbors=3)
 model.fit(X_train, y_train)
 
-# Testare
 y_pred = model.predict(X_test)
-print("Classification Report:\n")
+
+print("classification report:\n")
 print(classification_report(y_test, y_pred))
