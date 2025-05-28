@@ -1,60 +1,65 @@
 import os
 import cv2
 import numpy as np
+from skimage.feature import local_binary_pattern
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.metrics import classification_report
-from skimage.feature import local_binary_pattern
-emotions = {
-    'angry': 0,
-    'disgust': 1,
-    'fear': 2,
-    'happy': 3,
-    'sad': 4,
-    'surprise': 5,
-    'neutral': 6
-}
+# Associer chaque emotion a une valeur numerique
+label_map = {'angry': 0, 'disgust': 1, 'fear': 2, 'happy': 3, 'sad': 4, 'surprise': 5, 'neutral': 6}
 
-def load_dataset(folder_path):
-    X = [] #liste pour les images uploadees
-    y = [] #liste pour les etiquettes des images
-    for emotion in os.listdir(folder_path): #parcourir chaque directoire avec une emotion
-        emotion_path = os.path.join(folder_path, emotion)
-        if not os.path.isdir(emotion_path):
+# lire les paires image-etiquette
+def preparer_donnees(racine):
+    donnees, classes = [], []
+    noms = os.listdir(racine)
+
+    for nom in noms:
+        rep = os.path.join(racine, nom)
+        if not os.path.isdir(rep) or nom.lower() not in label_map:
             continue
-        label = emotions.get(emotion.lower()) #etiquette specifique
-        if label is None:
-            continue
-        for image_name in os.listdir(emotion_path): #parcourir les images de directoire
-            image_path = os.path.join(emotion_path, image_name)
-            image = cv2.imread(image_path, cv2.IMREAD_GRAYSCALE)
-            if image is None:
-                continue
-            image = cv2.resize(image, (48, 48))
-            X.append(image) #ajouter l'image dans la liste
-            y.append(label) #ajouter l'etiquette dans la liste
-    return np.array(X), np.array(y)
-def extract_lbp_features(images): #pour extraire les caracteristiques LBP des images
-    features = []
-    for image in images:
-        lbp = local_binary_pattern(image, P=8, R=1, method='uniform') #P=voisins, R=rayon
-        h, _ = np.histogram(lbp.ravel(), bins=np.arange(0, 10), range=(0, 9)) #l'histogramme de LBP avec un vector de 9 elements
-        h = h.astype("float") / (h.sum() + 1e-7) #normaliser l'histogramme pour eviter la division par 0
-        features.append(h)
-    return np.array(features)
-print("loading training data...")
-X_train_image, y_train = load_dataset("database/train")
-print("loading testing data...")
-X_test_image, y_test = load_dataset("database/test")
 
-print("extracting features using LBP...")
-X_train = extract_lbp_features(X_train_image)
-X_test = extract_lbp_features(X_test_image)
+        for fichier in os.listdir(rep):
+            chemin = os.path.join(rep, fichier)
+            img = cv2.imread(chemin, cv2.IMREAD_GRAYSCALE)
 
-print("training KNN classifier...")
-model = KNeighborsClassifier(n_neighbors=3)
-model.fit(X_train, y_train)
+            if img is not None:
+                petite = cv2.resize(img, (48, 48))
+                donnees.append(petite)
+                classes.append(label_map[nom.lower()])
 
-y_pred = model.predict(X_test)
+    return np.array(donnees), np.array(classes)
 
-print("classification report:\n")
-print(classification_report(y_test, y_pred))
+# Extraire une signature LBP pour chaque image
+def creer_vecteurs_lbp(liste_images):
+    resultats = []
+    for i in liste_images:
+        lbp = local_binary_pattern(i, P=8, R=1, method='uniform')
+        vect, _ = np.histogram(lbp.ravel(), bins=np.arange(10), range=(0, 9))
+        vect = vect.astype("float32")
+        vect /= (vect.sum() + 1e-6)
+        resultats.append(vect)
+    return np.array(resultats)
+
+
+def charger_base(dossier):
+    return preparer_donnees(dossier)
+    
+def processus_complet():
+    print("Debut du processus...")
+    print("Lecture des donnees d'entrainement")
+    images_appr, etiquettes_appr = charger_base("database/train")
+    print("Lecture des donnees de test")
+    images_test, etiquettes_test = charger_base("database/test")
+    print("Calcul des LBP pour l'ensemble d'entrainement")
+    X_train = creer_vecteurs_lbp(images_appr)
+    print("Calcul des LBP pour l'ensemble de test")
+    X_test = creer_vecteurs_lbp(images_test)
+    print("Initialisation du classifieur KNN...")
+    modele = KNeighborsClassifier(n_neighbors=3)
+    modele.fit(X_train, etiquettes_appr)
+    print("Prediction en cours...")
+    sorties = modele.predict(X_test)
+    print("Evaluation du modele :\n")
+    print(classification_report(etiquettes_test, sorties))
+
+if __name__ == "__main__":
+    processus_complet()
